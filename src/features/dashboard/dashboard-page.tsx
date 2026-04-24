@@ -112,6 +112,21 @@ export function DashboardPage() {
   const profilesMap = new Map(profiles.map((p) => [p.id, p.full_name]))
   const templatesMap = new Map(templates.map((t) => [t.id, t.nombre]))
 
+  const activityByUser = new Map<string, number>()
+
+  for (const item of activity) {
+    const count = activityByUser.get(item.user_id) ?? 0
+    activityByUser.set(item.user_id, count + 1)
+  }
+
+  const activityRanking = Array.from(activityByUser.entries())
+    .map(([userId, count]) => ({
+      userId,
+      name: profilesMap.get(userId) ?? 'Usuario',
+      count,
+    }))
+    .sort((a, b) => b.count - a.count)
+
   const cards = [
     {
       label: 'Checklist hoy',
@@ -170,6 +185,41 @@ export function DashboardPage() {
               Últimas acciones de hoy
             </span>
           </div>
+
+          {/* Team activity ranking */}
+          <Card>
+            <CardContent className="space-y-3">
+              <div className="flex items-center gap-2 text-brand-400">
+                <CheckSquare size={16} />
+                <span className="text-xs font-medium uppercase tracking-wide">
+                  Actividad del equipo hoy
+                </span>
+              </div>
+
+              {activityRanking.length === 0 ? (
+                <p className="text-sm text-brand-400">
+                  Sin actividad todavía.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {activityRanking.map((user) => (
+                    <div
+                      key={user.userId}
+                      className="flex items-center justify-between rounded-xl bg-brand-50 px-3 py-2"
+                    >
+                      <span className="text-sm font-medium text-brand-800">
+                        {user.name}
+                      </span>
+
+                      <span className="text-xs text-brand-500">
+                        {user.count} tareas
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           {activityLoading ? (
             <p className="text-sm text-brand-400">Cargando actividad...</p>
