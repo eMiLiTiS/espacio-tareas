@@ -127,6 +127,40 @@ export function DashboardPage() {
     }))
     .sort((a, b) => b.count - a.count)
 
+  const activeUserIds = new Set(activity.map(a => a.user_id))
+
+  const inactiveUsers = profiles
+    .filter(p => !activeUserIds.has(p.id))
+    .map(p => p.full_name)
+    {/* Inactive users */}
+    <Card>
+      <CardContent className="space-y-3">
+        <div className="flex items-center gap-2 text-brand-400">
+          <CalendarDays size={16} />
+          <span className="text-xs font-medium uppercase tracking-wide">
+            Sin actividad hoy
+          </span>
+        </div>
+
+        {inactiveUsers.length === 0 ? (
+          <p className="text-sm text-brand-400">
+            Todos los usuarios han registrado actividad.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {inactiveUsers.map((name) => (
+              <div
+                key={name}
+                className="rounded-xl bg-brand-50 px-3 py-2 text-sm text-brand-800"
+              >
+                {name}
+              </div>
+            ))}
+          </div>
+        )}S
+      </CardContent>
+    </Card>
+
   const cards = [
     {
       label: 'Checklist hoy',
