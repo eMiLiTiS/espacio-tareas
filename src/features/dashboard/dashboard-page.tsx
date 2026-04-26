@@ -73,7 +73,7 @@ export function DashboardPage() {
         .eq('clinic_id', profile!.clinic_id)
         .eq('fecha', today)
         .order('created_at', { ascending: false })
-        .limit(8)
+        .order('created_at', { ascending: false })
 
       if (error) throw error
       return data as ActivityItem[]
