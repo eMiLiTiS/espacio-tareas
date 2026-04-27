@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { CheckSquare, CalendarDays, Clock } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
@@ -7,6 +8,7 @@ import { supabase } from '@/lib/supabase'
 import { qk } from '@/lib/query-client'
 import { useAuth } from '@/auth/auth-provider'
 import { todayISO, weekStartISO, formatDateLong } from '@/utils/date'
+import { useState } from 'react'
 
 type ActivityItem = {
   id: string
@@ -27,7 +29,8 @@ type SimpleTemplate = {
 
 export function DashboardPage() {
   const { profile } = useAuth()
-  const today = todayISO()
+  const [selectedDate, setSelectedDate] = useState(todayISO())
+  const today = selectedDate
   const semana = weekStartISO()
 
   const { data: stats, isLoading } = useQuery({
@@ -185,6 +188,24 @@ export function DashboardPage() {
           Buenos días{profile ? `, ${profile.full_name.split(' ')[0]}` : ''}
         </h2>
         <p className="text-sm text-brand-400 capitalize">{formatDateLong(today)}</p>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <input
+          type="date"
+          value={selectedDate}
+          onChange={(e) => setSelectedDate(e.target.value)}
+          className="rounded-xl border border-brand-200 bg-white px-3 py-2 text-sm text-brand-800 focus:outline-none focus:ring-2 focus:ring-brand-400"
+        />
+
+        {selectedDate !== todayISO() && (
+          <button
+            onClick={() => setSelectedDate(todayISO())}
+            className="rounded-xl bg-brand-100 px-3 py-2 text-sm font-medium text-brand-700 hover:bg-brand-200"
+          >
+            Hoy
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
