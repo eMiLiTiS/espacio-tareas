@@ -8,7 +8,6 @@ import { supabase } from '@/lib/supabase'
 import { qk } from '@/lib/query-client'
 import { useAuth } from '@/auth/auth-provider'
 import { todayISO, weekStartISO, formatDateLong } from '@/utils/date'
-import { useState } from 'react'
 
 type ActivityItem = {
   id: string
