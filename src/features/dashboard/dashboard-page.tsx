@@ -29,6 +29,8 @@ type SimpleTemplate = {
 export function DashboardPage() {
   const { profile } = useAuth()
   const [selectedDate, setSelectedDate] = useState(todayISO())
+  const [selectedUserId, setSelectedUserId] = useState('all')
+
   const today = selectedDate
   const semana = weekStartISO()
 
@@ -67,15 +69,20 @@ export function DashboardPage() {
   })
 
   const { data: activity = [], isLoading: activityLoading } = useQuery({
-    queryKey: ['dashboard-activity', profile?.clinic_id ?? '', today],
+    queryKey: ['dashboard-activity', profile?.clinic_id ?? '', today, selectedUserId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('checklist_completions')
         .select('id, created_at, template_id, user_id')
         .eq('clinic_id', profile!.clinic_id)
         .eq('fecha', today)
         .order('created_at', { ascending: false })
-        .order('created_at', { ascending: false })
+
+      if (selectedUserId !== 'all') {
+        query = query.eq('user_id', selectedUserId)
+      }
+
+      const { data, error } = await query
 
       if (error) throw error
       return data as ActivityItem[]
@@ -129,39 +136,11 @@ export function DashboardPage() {
     }))
     .sort((a, b) => b.count - a.count)
 
-  const activeUserIds = new Set(activity.map(a => a.user_id))
+  const activeUserIds = new Set(activity.map((a) => a.user_id))
 
   const inactiveUsers = profiles
-    .filter(p => !activeUserIds.has(p.id))
-    .map(p => p.full_name)
-    {/* Inactive users */}
-    <Card>
-      <CardContent className="space-y-3">
-        <div className="flex items-center gap-2 text-brand-400">
-          <CalendarDays size={16} />
-          <span className="text-xs font-medium uppercase tracking-wide">
-            Sin actividad hoy
-          </span>
-        </div>
-
-        {inactiveUsers.length === 0 ? (
-          <p className="text-sm text-brand-400">
-            Todos los usuarios han registrado actividad.
-          </p>
-        ) : (
-          <div className="space-y-2">
-            {inactiveUsers.map((name) => (
-              <div
-                key={name}
-                className="rounded-xl bg-brand-50 px-3 py-2 text-sm text-brand-800"
-              >
-                {name}
-              </div>
-            ))}
-          </div>
-        )}S
-      </CardContent>
-    </Card>
+    .filter((p) => !activeUserIds.has(p.id))
+    .map((p) => p.full_name)
 
   const cards = [
     {
@@ -189,7 +168,7 @@ export function DashboardPage() {
         <p className="text-sm text-brand-400 capitalize">{formatDateLong(today)}</p>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <input
           type="date"
           value={selectedDate}
@@ -205,6 +184,19 @@ export function DashboardPage() {
             Hoy
           </button>
         )}
+
+        <select
+          value={selectedUserId}
+          onChange={(e) => setSelectedUserId(e.target.value)}
+          className="rounded-xl border border-brand-200 bg-white px-3 py-2 text-sm text-brand-800 focus:outline-none focus:ring-2 focus:ring-brand-400"
+        >
+          <option value="all">Todos</option>
+          {profiles.map((user) => (
+            <option key={user.id} value={user.id}>
+              {user.full_name}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -236,50 +228,15 @@ export function DashboardPage() {
           <div className="flex items-center gap-2 text-brand-400">
             <Clock size={16} />
             <span className="text-xs font-medium uppercase tracking-wide">
-              Últimas acciones de hoy
+              Últimas acciones
             </span>
           </div>
-
-          {/* Team activity ranking */}
-          <Card>
-            <CardContent className="space-y-3">
-              <div className="flex items-center gap-2 text-brand-400">
-                <CheckSquare size={16} />
-                <span className="text-xs font-medium uppercase tracking-wide">
-                  Actividad del equipo hoy
-                </span>
-              </div>
-
-              {activityRanking.length === 0 ? (
-                <p className="text-sm text-brand-400">
-                  Sin actividad todavía.
-                </p>
-              ) : (
-                <div className="space-y-2">
-                  {activityRanking.map((user) => (
-                    <div
-                      key={user.userId}
-                      className="flex items-center justify-between rounded-xl bg-brand-50 px-3 py-2"
-                    >
-                      <span className="text-sm font-medium text-brand-800">
-                        {user.name}
-                      </span>
-
-                      <span className="text-xs text-brand-500">
-                        {user.count} tareas
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
 
           {activityLoading ? (
             <p className="text-sm text-brand-400">Cargando actividad...</p>
           ) : activity.length === 0 ? (
             <p className="text-sm text-brand-400">
-              Todavía no hay acciones registradas hoy.
+              No hay acciones registradas para esta fecha.
             </p>
           ) : (
             <div className="space-y-2">
@@ -310,13 +267,68 @@ export function DashboardPage() {
         </CardContent>
       </Card>
 
+      <Card>
+        <CardContent className="space-y-3">
+          <div className="flex items-center gap-2 text-brand-400">
+            <CheckSquare size={16} />
+            <span className="text-xs font-medium uppercase tracking-wide">
+              Actividad del equipo
+            </span>
+          </div>
+
+          {activityRanking.length === 0 ? (
+            <p className="text-sm text-brand-400">Sin actividad todavía.</p>
+          ) : (
+            <div className="space-y-2">
+              {activityRanking.map((user) => (
+                <div
+                  key={user.userId}
+                  className="flex items-center justify-between rounded-xl bg-brand-50 px-3 py-2"
+                >
+                  <span className="text-sm font-medium text-brand-800">{user.name}</span>
+                  <span className="text-xs text-brand-500">{user.count} tareas</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="space-y-3">
+          <div className="flex items-center gap-2 text-brand-400">
+            <CalendarDays size={16} />
+            <span className="text-xs font-medium uppercase tracking-wide">
+              Sin actividad
+            </span>
+          </div>
+
+          {inactiveUsers.length === 0 ? (
+            <p className="text-sm text-brand-400">
+              Todos los usuarios tienen actividad registrada.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {inactiveUsers.map((name) => (
+                <div
+                  key={name}
+                  className="rounded-xl bg-brand-50 px-3 py-2 text-sm text-brand-800"
+                >
+                  {name}
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       <div className="flex flex-wrap gap-2">
         <a
           href="/checklist"
           className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-800 text-white text-sm font-medium hover:bg-brand-700 transition-colors"
         >
           <CheckSquare size={16} />
-          Ver checklist de hoy
+          Ver checklist
         </a>
 
         <a
