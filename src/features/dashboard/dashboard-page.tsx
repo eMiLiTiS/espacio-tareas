@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { CheckSquare, CalendarDays, Clock } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabase'
 import { qk } from '@/lib/query-client'
 import { useAuth } from '@/auth/auth-provider'
 import { todayISO, weekStartISO, formatDateLong } from '@/utils/date'
+import jsPDF from 'jspdf'
 
 type ActivityItem = {
   id: string
@@ -31,8 +32,145 @@ export function DashboardPage() {
   const [selectedDate, setSelectedDate] = useState(todayISO())
   const [selectedUserId, setSelectedUserId] = useState('all')
 
+    // 👇 AQUÍ
+  const [exportOptions, setExportOptions] = useState({
+    resumen: true,
+    actividad: true,
+    ranking: true,
+    inactivos: true,
+  })
+
   const today = selectedDate
   const semana = weekStartISO()
+  const dashboardRef = useRef<HTMLDivElement>(null)
+
+  const handleExportPDF = () => {
+    const pdf = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4',
+    })
+
+    const pageWidth = pdf.internal.pageSize.getWidth()
+    const margin = 14
+    let y = 18
+
+    const selectedUserName =
+      selectedUserId === 'all'
+        ? 'Todos los usuarios'
+        : profilesMap.get(selectedUserId) ?? 'Usuario'
+
+    pdf.setFont('helvetica', 'bold')
+    pdf.setFontSize(18)
+    pdf.text('Espacio Tareas', margin, y)
+
+    y += 8
+    pdf.setFont('helvetica', 'normal')
+    pdf.setFontSize(11)
+    pdf.text(`Reporte diario · ${formatDateLong(today)}`, margin, y)
+
+    y += 6
+    pdf.text(`Filtro: ${selectedUserName}`, margin, y)
+
+    y += 12
+    if (exportOptions.resumen) {
+      pdf.setFont('helvetica', 'bold')
+      pdf.setFontSize(13)
+      pdf.text('Resumen', margin, y)
+
+      y += 8
+      pdf.setFont('helvetica', 'normal')
+      pdf.setFontSize(11)
+      pdf.text(`Checklist: ${stats?.completedToday ?? 0} / ${stats?.totalTemplates ?? 0}`, margin, y)
+
+      y += 6
+      pdf.text(`Porcentaje completado: ${stats?.checklistPct ?? 0}%`, margin, y)
+
+      y += 6
+      pdf.text(`Registros esta semana: ${stats?.weeklyCount ?? 0}`, margin, y)
+    }
+
+    if (exportOptions.actividad) {
+      y += 12
+      pdf.setFont('helvetica', 'bold')
+      pdf.setFontSize(13)
+      pdf.text('Últimas acciones', margin, y)
+
+      y += 8
+      pdf.setFont('helvetica', 'normal')
+      pdf.setFontSize(10)
+
+      if (activity.length === 0) {
+        pdf.text('No hay acciones registradas para esta fecha.', margin, y)
+        y += 6
+      } else {
+        activity.forEach((item) => {
+          const hora = new Date(item.created_at).toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit',
+          })
+
+          const tarea = templatesMap.get(item.template_id) ?? 'Tarea sin nombre'
+          const usuario = profilesMap.get(item.user_id) ?? 'Usuario desconocido'
+
+          const line = `${hora} · ${usuario} · ${tarea}`
+
+          const lines = pdf.splitTextToSize(line, pageWidth - margin * 2)
+
+          if (y > 275) {
+            pdf.addPage()
+            y = 18
+          }
+
+          pdf.text(lines, margin, y)
+          y += lines.length * 5 + 2
+        })
+      }
+
+      y += 6
+    
+    } else {
+      activityRanking.forEach((user) => {
+        if (y > 275) {
+          pdf.addPage()
+          y = 18
+        }
+
+        pdf.text(`${user.name}: ${user.count} tareas`, margin, y)
+        y += 6
+      })
+    }
+
+    y += 8
+    if (y > 260) {
+      pdf.addPage()
+      y = 18
+    }
+
+    pdf.setFont('helvetica', 'bold')
+    pdf.setFontSize(13)
+    pdf.text('Sin actividad', margin, y)
+
+    y += 8
+    pdf.setFont('helvetica', 'normal')
+    pdf.setFontSize(10)
+
+    if (inactiveUsers.length === 0) {
+      pdf.text('Todos los usuarios tienen actividad registrada.', margin, y)
+    } else {
+      inactiveUsers.forEach((name) => {
+        if (y > 275) {
+          pdf.addPage()
+          y = 18
+        }
+
+        pdf.text(`- ${name}`, margin, y)
+        y += 6
+      })
+    }
+
+    pdf.save(`reporte-diario-${today}.pdf`)
+  }
 
   const { data: stats, isLoading } = useQuery({
     queryKey: qk.dashboardStats(profile?.clinic_id ?? '', today),
@@ -160,7 +298,7 @@ export function DashboardPage() {
   ]
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div ref={dashboardRef} className="max-w-2xl space-y-6">
       <div>
         <h2 className="text-lg font-semibold text-brand-900">
           Buenos días{profile ? `, ${profile.full_name.split(' ')[0]}` : ''}
@@ -197,6 +335,52 @@ export function DashboardPage() {
             </option>
           ))}
         </select>
+      </div>
+
+      <div className="flex flex-wrap gap-3 text-xs text-brand-700">
+        <label className="flex items-center gap-1">
+          <input
+            type="checkbox"
+            checked={exportOptions.resumen}
+            onChange={() =>
+              setExportOptions((o) => ({ ...o, resumen: !o.resumen }))
+            }
+          />
+          Resumen
+        </label>
+
+        <label className="flex items-center gap-1">
+          <input
+            type="checkbox"
+            checked={exportOptions.actividad}
+            onChange={() =>
+              setExportOptions((o) => ({ ...o, actividad: !o.actividad }))
+            }
+          />
+          Actividad
+        </label>
+
+        <label className="flex items-center gap-1">
+          <input
+            type="checkbox"
+            checked={exportOptions.ranking}
+            onChange={() =>
+              setExportOptions((o) => ({ ...o, ranking: !o.ranking }))
+            }
+          />
+          Ranking
+        </label>
+
+        <label className="flex items-center gap-1">
+          <input
+            type="checkbox"
+            checked={exportOptions.inactivos}
+            onChange={() =>
+              setExportOptions((o) => ({ ...o, inactivos: !o.inactivos }))
+            }
+          />
+          Sin actividad
+        </label>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -323,6 +507,14 @@ export function DashboardPage() {
       </Card>
 
       <div className="flex flex-wrap gap-2">
+        
+        <button
+          onClick={handleExportPDF}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-black text-white text-sm font-medium hover:opacity-90"
+        >
+          Exportar PDF
+        </button>
+        
         <a
           href="/checklist"
           className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-800 text-white text-sm font-medium hover:bg-brand-700 transition-colors"
