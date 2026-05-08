@@ -211,6 +211,39 @@ export type Database = {
         }
         Relationships: []
       }
+      incidencias: {
+        Row: {
+          id: string
+          clinic_id: string
+          user_id: string
+          titulo: string
+          descripcion: string | null
+          estado: 'abierta' | 'en_proceso' | 'resuelta'
+          created_at: string
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          clinic_id: string
+          user_id: string
+          titulo: string
+          descripcion?: string | null
+          estado?: 'abierta' | 'en_proceso' | 'resuelta'
+          created_at?: string
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          clinic_id?: string
+          user_id?: string
+          titulo?: string
+          descripcion?: string | null
+          estado?: 'abierta' | 'en_proceso' | 'resuelta'
+          created_at?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

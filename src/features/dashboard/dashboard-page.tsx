@@ -185,7 +185,7 @@ export function DashboardPage() {
           .eq('activo', true),
         supabase
           .from('checklist_completions')
-          .select('id', { count: 'exact' })
+          .select('template_id')
           .eq('clinic_id', clinicId)
           .eq('fecha', today),
         supabase
@@ -196,7 +196,10 @@ export function DashboardPage() {
       ])
 
       const totalTemplates = templatesRes.count ?? 0
-      const completedToday = completionsRes.count ?? 0
+      // Count distinct templates marked by anyone (multiuser-safe)
+      const completedToday = new Set(
+        (completionsRes.data ?? []).map((r) => r.template_id)
+      ).size
       const weeklyCount = weeklyRes.count ?? 0
       const checklistPct =
         totalTemplates > 0 ? Math.round((completedToday / totalTemplates) * 100) : 0

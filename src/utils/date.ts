@@ -53,3 +53,10 @@ export function formatDateShort(isoDate: string): string {
 export function isTodayDate(isoDate: string): boolean {
   return isToday(parseISO(isoDate))
 }
+
+/** Returns the date N days before today as YYYY-MM-DD */
+export function subDaysISO(days: number): string {
+  const d = new Date()
+  d.setDate(d.getDate() - days)
+  return format(d, 'yyyy-MM-dd')
+}

@@ -7,6 +7,7 @@ import { ChecklistPage } from '@/features/checklist/checklist-page'
 import { SemanalPage } from '@/features/semanal/semanal-page'
 import { ActividadPage } from '@/features/actividad/actividad-page'
 import { AjustesPage } from '@/features/ajustes/ajustes-page'
+import { IncidenciasPage } from '@/features/incidencias/incidencias-page'
 
 export default function App() {
   return (
@@ -21,6 +22,7 @@ export default function App() {
           <Route path="/checklist" element={<ChecklistPage />} />
           <Route path="/semanal" element={<SemanalPage />} />
           <Route path="/actividad" element={<ActividadPage />} />
+          <Route path="/incidencias" element={<IncidenciasPage />} />
           <Route path="/ajustes" element={<AjustesPage />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Route>

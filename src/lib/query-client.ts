@@ -27,4 +27,7 @@ export const qk = {
     ['global-activity', clinicId, semanaInicio] as const,
   dashboardStats: (clinicId: string, fecha: string) =>
     ['dashboard-stats', clinicId, fecha] as const,
+  checklistRecentCompletions: (clinicId: string) =>
+    ['checklist-recent-completions', clinicId] as const,
+  incidencias: (clinicId: string) => ['incidencias', clinicId] as const,
 }

@@ -10,6 +10,8 @@ export type Category = Database['public']['Tables']['categories']['Row']
 export type ChecklistTemplate = Database['public']['Tables']['checklist_templates']['Row']
 export type ChecklistCompletion = Database['public']['Tables']['checklist_completions']['Row']
 export type WeeklyRecord = Database['public']['Tables']['weekly_records']['Row']
+export type Incidencia = Database['public']['Tables']['incidencias']['Row']
+export type EstadoIncidencia = 'abierta' | 'en_proceso' | 'resuelta'
 
 export interface GlobalActivityRow {
   id: string
