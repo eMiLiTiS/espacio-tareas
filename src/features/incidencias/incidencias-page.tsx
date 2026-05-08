@@ -11,8 +11,11 @@ import { SkeletonList } from '@/components/ui/skeleton'
 import { Modal } from '@/components/ui/modal'
 import type { Incidencia } from '@/types/domain'
 
-type IncidenciaRow = Incidencia & {
-  profiles: { full_name: string } | null
+type IncidenciaRow = Incidencia
+
+type ProfileLite = {
+  id: string
+  full_name: string
 }
 
 type EstadoFilter = 'todas' | 'abierta' | 'en_proceso' | 'resuelta'
@@ -50,7 +53,7 @@ export function IncidenciasPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('incidencias')
-        .select('*, profiles:user_id(full_name)')
+        .select('*')
         .eq('clinic_id', profile!.clinic_id)
         .order('created_at', { ascending: false })
       if (error) throw error
@@ -58,6 +61,22 @@ export function IncidenciasPage() {
     },
     enabled: !!profile,
   })
+
+  const { data: profiles = [] } = useQuery({
+  queryKey: ['incidencias-profiles', profile?.clinic_id ?? ''],
+  queryFn: async () => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, full_name')
+      .eq('clinic_id', profile!.clinic_id)
+
+    if (error) throw error
+    return data as ProfileLite[]
+  },
+  enabled: !!profile,
+})
+
+const profilesMap = new Map(profiles.map((p) => [p.id, p.full_name]))
 
   const createMutation = useMutation({
     mutationFn: async () => {
@@ -69,7 +88,7 @@ export function IncidenciasPage() {
           titulo: titulo.trim(),
           descripcion: descripcion.trim() || null,
         })
-        .select('*, profiles:user_id(full_name)')
+        .select('*')
         .single()
       if (error) throw error
       return data as IncidenciaRow
@@ -88,7 +107,7 @@ export function IncidenciasPage() {
   })
 
   const updateEstadoMutation = useMutation({
-    mutationFn: async ({ id, estado }: { id: string; estado: string }) => {
+    mutationFn: async ({ id, estado }: { id: string; estado: Incidencia['estado'] }) => {
       const { error } = await supabase
         .from('incidencias')
         .update({ estado, updated_at: new Date().toISOString() })
@@ -206,7 +225,7 @@ export function IncidenciasPage() {
               {/* Meta + estado selector */}
               <div className="flex items-center justify-between gap-3">
                 <p className="text-[11px] text-brand-400">
-                  {inc.profiles?.full_name ?? 'Usuario'} ·{' '}
+                  {profilesMap.get(inc.user_id) ?? 'Usuario'} ·{' '}
                   {new Date(inc.created_at).toLocaleString('es', {
                     day: '2-digit',
                     month: 'short',
@@ -219,7 +238,10 @@ export function IncidenciasPage() {
                   <select
                     value={inc.estado}
                     onChange={(e) =>
-                      updateEstadoMutation.mutate({ id: inc.id, estado: e.target.value })
+                      updateEstadoMutation.mutate({
+                        id: inc.id,
+                        estado: e.target.value as Incidencia['estado'],
+                      })
                     }
                     disabled={updateEstadoMutation.isPending}
                     className="text-xs border border-brand-200 rounded-lg px-2 py-1 text-brand-700 bg-white focus:outline-none focus:ring-1 focus:ring-brand-400"
