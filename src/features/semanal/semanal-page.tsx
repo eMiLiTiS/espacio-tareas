@@ -15,6 +15,19 @@ import { DIAS } from '@/types/domain'
 
 const DIA_LIST = Object.entries(DIAS) as [Dia, string][]
 
+function getCurrentDia(): Dia {
+  const day = new Date().getDay()
+
+  if (day === 1) return 'lunes'
+  if (day === 2) return 'martes'
+  if (day === 3) return 'miercoles'
+  if (day === 4) return 'jueves'
+  if (day === 5) return 'viernes'
+  if (day === 6) return 'sabado'
+
+  return 'domingo'
+}
+
 type WeeklyTemplate = {
   id: string
   clinic_id: string
@@ -117,7 +130,7 @@ export function SemanalPage() {
         clinic_id: profile.clinic_id,
         user_id: profile.id,
         semana_inicio: semana,
-        dia: 'lunes',
+        dia: getCurrentDia(),
         actividad: template.nombre,
         cantidad,
         observacion: null,
