@@ -17,6 +17,16 @@ type ActivityItem = {
   user_id: string
 }
 
+type WeeklyItem = {
+  id: string
+  user_id: string
+  dia: string
+  actividad: string
+  cantidad: number | null
+  observacion: string | null
+  created_at: string
+}
+
 type SimpleProfile = {
   id: string
   full_name: string
@@ -32,7 +42,6 @@ export function DashboardPage() {
   const [selectedDate, setSelectedDate] = useState(todayISO())
   const [selectedUserId, setSelectedUserId] = useState('all')
 
-    // 👇 AQUÍ
   const [exportOptions, setExportOptions] = useState({
     resumen: true,
     actividad: true,
@@ -43,134 +52,6 @@ export function DashboardPage() {
   const today = selectedDate
   const semana = weekStartISO()
   const dashboardRef = useRef<HTMLDivElement>(null)
-
-  const handleExportPDF = () => {
-    const pdf = new jsPDF({
-      orientation: 'portrait',
-      unit: 'mm',
-      format: 'a4',
-    })
-
-    const pageWidth = pdf.internal.pageSize.getWidth()
-    const margin = 14
-    let y = 18
-
-    const selectedUserName =
-      selectedUserId === 'all'
-        ? 'Todos los usuarios'
-        : profilesMap.get(selectedUserId) ?? 'Usuario'
-
-    pdf.setFont('helvetica', 'bold')
-    pdf.setFontSize(18)
-    pdf.text('Espacio Tareas', margin, y)
-
-    y += 8
-    pdf.setFont('helvetica', 'normal')
-    pdf.setFontSize(11)
-    pdf.text(`Reporte diario · ${formatDateLong(today)}`, margin, y)
-
-    y += 6
-    pdf.text(`Filtro: ${selectedUserName}`, margin, y)
-
-    y += 12
-    if (exportOptions.resumen) {
-      pdf.setFont('helvetica', 'bold')
-      pdf.setFontSize(13)
-      pdf.text('Resumen', margin, y)
-
-      y += 8
-      pdf.setFont('helvetica', 'normal')
-      pdf.setFontSize(11)
-      pdf.text(`Checklist: ${stats?.completedToday ?? 0} / ${stats?.totalTemplates ?? 0}`, margin, y)
-
-      y += 6
-      pdf.text(`Porcentaje completado: ${stats?.checklistPct ?? 0}%`, margin, y)
-
-      y += 6
-      pdf.text(`Registros esta semana: ${stats?.weeklyCount ?? 0}`, margin, y)
-    }
-
-    if (exportOptions.actividad) {
-      y += 12
-      pdf.setFont('helvetica', 'bold')
-      pdf.setFontSize(13)
-      pdf.text('Últimas acciones', margin, y)
-
-      y += 8
-      pdf.setFont('helvetica', 'normal')
-      pdf.setFontSize(10)
-
-      if (activity.length === 0) {
-        pdf.text('No hay acciones registradas para esta fecha.', margin, y)
-        y += 6
-      } else {
-        activity.forEach((item) => {
-          const hora = new Date(item.created_at).toLocaleTimeString([], {
-            hour: '2-digit',
-            minute: '2-digit',
-          })
-
-          const tarea = templatesMap.get(item.template_id) ?? 'Tarea sin nombre'
-          const usuario = profilesMap.get(item.user_id) ?? 'Usuario desconocido'
-
-          const line = `${hora} · ${usuario} · ${tarea}`
-
-          const lines = pdf.splitTextToSize(line, pageWidth - margin * 2)
-
-          if (y > 275) {
-            pdf.addPage()
-            y = 18
-          }
-
-          pdf.text(lines, margin, y)
-          y += lines.length * 5 + 2
-        })
-      }
-
-      y += 6
-    
-    } else {
-      activityRanking.forEach((user) => {
-        if (y > 275) {
-          pdf.addPage()
-          y = 18
-        }
-
-        pdf.text(`${user.name}: ${user.count} tareas`, margin, y)
-        y += 6
-      })
-    }
-
-    y += 8
-    if (y > 260) {
-      pdf.addPage()
-      y = 18
-    }
-
-    pdf.setFont('helvetica', 'bold')
-    pdf.setFontSize(13)
-    pdf.text('Sin actividad', margin, y)
-
-    y += 8
-    pdf.setFont('helvetica', 'normal')
-    pdf.setFontSize(10)
-
-    if (inactiveUsers.length === 0) {
-      pdf.text('Todos los usuarios tienen actividad registrada.', margin, y)
-    } else {
-      inactiveUsers.forEach((name) => {
-        if (y > 275) {
-          pdf.addPage()
-          y = 18
-        }
-
-        pdf.text(`- ${name}`, margin, y)
-        y += 6
-      })
-    }
-
-    pdf.save(`reporte-diario-${today}.pdf`)
-  }
 
   const { data: stats, isLoading } = useQuery({
     queryKey: qk.dashboardStats(profile?.clinic_id ?? '', today),
@@ -196,7 +77,6 @@ export function DashboardPage() {
       ])
 
       const totalTemplates = templatesRes.count ?? 0
-      // Count distinct templates marked by anyone (multiuser-safe)
       const completedToday = new Set(
         (completionsRes.data ?? []).map((r) => r.template_id)
       ).size
@@ -227,6 +107,24 @@ export function DashboardPage() {
 
       if (error) throw error
       return data as ActivityItem[]
+    },
+    enabled: !!profile,
+  })
+
+  const { data: weeklyActivity = [] } = useQuery({
+    queryKey: ['dashboard-weekly-activity', profile?.clinic_id ?? '', semana, selectedUserId],
+    queryFn: async () => {
+      let query = supabase
+        .from('weekly_records')
+        .select('id, user_id, dia, actividad, cantidad, observacion, created_at')
+        .eq('clinic_id', profile!.clinic_id)
+        .eq('semana_inicio', semana)
+        .order('created_at', { ascending: false })      
+
+      const { data, error } = await query
+
+      if (error) throw error
+      return data as WeeklyItem[]
     },
     enabled: !!profile,
   })
@@ -299,6 +197,183 @@ export function DashboardPage() {
       Icon: CalendarDays,
     },
   ]
+
+  const handleExportPDF = () => {
+    const pdf = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4',
+    })
+
+    const pageWidth = pdf.internal.pageSize.getWidth()
+    const margin = 14
+    let y = 18
+
+    const selectedUserName =
+      selectedUserId === 'all'
+        ? 'Todos los usuarios'
+        : profilesMap.get(selectedUserId) ?? 'Usuario'
+
+    pdf.setFont('helvetica', 'bold')
+    pdf.setFontSize(18)
+    pdf.text('Espacio Tareas', margin, y)
+
+    y += 8
+    pdf.setFont('helvetica', 'normal')
+    pdf.setFontSize(11)
+    pdf.text(`Reporte diario · ${formatDateLong(today)}`, margin, y)
+
+    y += 6
+    pdf.text(`Filtro: ${selectedUserName}`, margin, y)
+
+    if (exportOptions.resumen) {
+      y += 12
+      pdf.setFont('helvetica', 'bold')
+      pdf.setFontSize(13)
+      pdf.text('Resumen', margin, y)
+
+      y += 8
+      pdf.setFont('helvetica', 'normal')
+      pdf.setFontSize(11)
+      pdf.text(`Checklist: ${stats?.completedToday ?? 0} / ${stats?.totalTemplates ?? 0}`, margin, y)
+
+      y += 6
+      pdf.text(`Porcentaje completado: ${stats?.checklistPct ?? 0}%`, margin, y)
+
+      y += 6
+      pdf.text(`Registros esta semana: ${stats?.weeklyCount ?? 0}`, margin, y)
+
+      if (weeklyActivity.length > 0) {
+        y += 10
+        pdf.setFont('helvetica', 'bold')
+        pdf.setFontSize(12)
+        pdf.text('Detalle semanal', margin, y)
+
+        y += 7
+        pdf.setFont('helvetica', 'normal')
+        pdf.setFontSize(10)
+
+        weeklyActivity.forEach((item) => {
+          if (y > 275) {
+            pdf.addPage()
+            y = 18
+          }
+
+          const usuario = profilesMap.get(item.user_id) ?? 'Usuario desconocido'
+          const cantidad = item.cantidad != null ? ` · Cantidad: ${item.cantidad}` : ''
+          const obs = item.observacion ? ` · ${item.observacion}` : ''
+          const line = `${item.dia} · ${usuario} · ${item.actividad}${cantidad}${obs}`
+          const lines = pdf.splitTextToSize(line, pageWidth - margin * 2)
+
+          pdf.text(lines, margin, y)
+          y += lines.length * 5 + 2
+        })
+      }
+    }
+
+    if (exportOptions.actividad) {
+      y += 12
+      if (y > 260) {
+        pdf.addPage()
+        y = 18
+      }
+
+      pdf.setFont('helvetica', 'bold')
+      pdf.setFontSize(13)
+      pdf.text('Últimas acciones', margin, y)
+
+      y += 8
+      pdf.setFont('helvetica', 'normal')
+      pdf.setFontSize(10)
+
+      if (activity.length === 0) {
+        pdf.text('No hay acciones registradas para esta fecha.', margin, y)
+        y += 6
+      } else {
+        activity.forEach((item) => {
+          if (y > 275) {
+            pdf.addPage()
+            y = 18
+          }
+
+          const hora = new Date(item.created_at).toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit',
+          })
+          const tarea = templatesMap.get(item.template_id) ?? 'Tarea sin nombre'
+          const usuario = profilesMap.get(item.user_id) ?? 'Usuario desconocido'
+          const line = `${hora} · ${usuario} · ${tarea}`
+          const lines = pdf.splitTextToSize(line, pageWidth - margin * 2)
+
+          pdf.text(lines, margin, y)
+          y += lines.length * 5 + 2
+        })
+      }
+    }
+
+    if (exportOptions.ranking) {
+      y += 8
+      if (y > 260) {
+        pdf.addPage()
+        y = 18
+      }
+
+      pdf.setFont('helvetica', 'bold')
+      pdf.setFontSize(13)
+      pdf.text('Actividad del equipo', margin, y)
+
+      y += 8
+      pdf.setFont('helvetica', 'normal')
+      pdf.setFontSize(10)
+
+      if (activityRanking.length === 0) {
+        pdf.text('Sin actividad todavía.', margin, y)
+        y += 6
+      } else {
+        activityRanking.forEach((user) => {
+          if (y > 275) {
+            pdf.addPage()
+            y = 18
+          }
+
+          pdf.text(`${user.name}: ${user.count} tareas`, margin, y)
+          y += 6
+        })
+      }
+    }
+
+    if (exportOptions.inactivos) {
+      y += 8
+      if (y > 260) {
+        pdf.addPage()
+        y = 18
+      }
+
+      pdf.setFont('helvetica', 'bold')
+      pdf.setFontSize(13)
+      pdf.text('Sin actividad', margin, y)
+
+      y += 8
+      pdf.setFont('helvetica', 'normal')
+      pdf.setFontSize(10)
+
+      if (inactiveUsers.length === 0) {
+        pdf.text('Todos los usuarios tienen actividad registrada.', margin, y)
+      } else {
+        inactiveUsers.forEach((name) => {
+          if (y > 275) {
+            pdf.addPage()
+            y = 18
+          }
+
+          pdf.text(`- ${name}`, margin, y)
+          y += 6
+        })
+      }
+    }
+
+    pdf.save(`reporte-diario-${today}.pdf`)
+  }
 
   return (
     <div ref={dashboardRef} className="max-w-2xl space-y-6">
@@ -510,14 +585,13 @@ export function DashboardPage() {
       </Card>
 
       <div className="flex flex-wrap gap-2">
-        
         <button
           onClick={handleExportPDF}
           className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-black text-white text-sm font-medium hover:opacity-90"
         >
           Exportar PDF
         </button>
-        
+
         <a
           href="/checklist"
           className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-800 text-white text-sm font-medium hover:bg-brand-700 transition-colors"
