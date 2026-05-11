@@ -146,6 +146,36 @@ export function SemanalPage() {
     toast.success('Guardado')
   }
 
+  async function saveTemplateObservacion(template: WeeklyTemplate, rawValue: string) {
+    if (!profile) return
+
+    const observacion = rawValue.trim() || null
+    const existing = recordsByActividad.get(template.nombre)
+
+    if (existing) {
+      if ((existing.observacion ?? null) === observacion) return
+      const { error } = await supabase
+        .from('weekly_records')
+        .update({ observacion })
+        .eq('id', existing.id)
+      if (error) toast.error(error.message)
+    } else {
+      if (!observacion) return
+      const { error } = await supabase.from('weekly_records').insert({
+        clinic_id: profile.clinic_id,
+        user_id: profile.id,
+        semana_inicio: semana,
+        dia: getCurrentDia(),
+        actividad: template.nombre,
+        cantidad: null,
+        observacion,
+      })
+      if (error) toast.error(error.message)
+    }
+
+    qc.invalidateQueries({ queryKey: qk.weeklyRecords(profile.id, semana) })
+  }
+
   return (
     <div className="max-w-2xl space-y-5">
       <div className="flex items-center justify-between bg-white rounded-2xl border border-brand-100 px-4 py-3">
@@ -191,26 +221,36 @@ export function SemanalPage() {
             const current = recordsByActividad.get(template.nombre)
 
             return (
-              <div key={template.id} className="flex items-center gap-3 px-4 py-3">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-brand-800">
-                    {template.nombre}
-                  </p>
-
-                  {template.unidad && (
-                    <p className="text-xs text-brand-400 mt-0.5">
-                      {template.unidad}
+              <div key={template.id} className="px-4 py-3 space-y-2">
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-brand-800">
+                      {template.nombre}
                     </p>
-                  )}
+
+                    {template.unidad && (
+                      <p className="text-xs text-brand-400 mt-0.5">
+                        {template.unidad}
+                      </p>
+                    )}
+                  </div>
+
+                  <input
+                    type="number"
+                    min="0"
+                    defaultValue={current?.cantidad ?? ''}
+                    onBlur={(e) => saveTemplateValue(template, e.target.value)}
+                    className="w-24 px-3 py-2 text-sm text-right border border-brand-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-400"
+                    placeholder="0"
+                  />
                 </div>
 
                 <input
-                  type="number"
-                  min="0"
-                  defaultValue={current?.cantidad ?? ''}
-                  onBlur={(e) => saveTemplateValue(template, e.target.value)}
-                  className="w-28 px-3 py-2 text-sm text-right border border-brand-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-400"
-                  placeholder="0"
+                  type="text"
+                  defaultValue={current?.observacion ?? ''}
+                  onBlur={(e) => saveTemplateObservacion(template, e.target.value)}
+                  className="w-full px-3 py-1.5 text-xs border border-brand-100 rounded-lg focus:outline-none focus:ring-1 focus:ring-brand-300 text-brand-600 placeholder:text-brand-300"
+                  placeholder="Observación (opcional)..."
                 />
               </div>
             )

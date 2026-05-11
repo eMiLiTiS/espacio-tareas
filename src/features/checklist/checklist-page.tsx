@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { CheckSquare, ChevronDown, ChevronRight, AlertTriangle } from 'lucide-react'
@@ -394,9 +394,29 @@ function ChecklistItem({
   disabled: boolean
   isAdmin: boolean
 }) {
+  const { profile } = useAuth()
+  const qc = useQueryClient()
+  const today = todayISO()
   const [qty, setQty] = useState(myCompletion?.cantidad?.toString() ?? '')
+  const [obs, setObs] = useState(myCompletion?.observacion ?? '')
   const checked = !!myCompletion
   const showAlert = !lastGlobalDate || lastGlobalDate < alertThreshold
+
+  useEffect(() => {
+    setObs(myCompletion?.observacion ?? '')
+  }, [myCompletion?.id])
+
+  async function saveObs(value: string) {
+    if (!myCompletion || !profile) return
+    const observacion = value.trim() || null
+    if ((myCompletion.observacion ?? null) === observacion) return
+    const { error } = await supabase
+      .from('checklist_completions')
+      .update({ observacion })
+      .eq('id', myCompletion.id)
+    if (error) toast.error(error.message)
+    else qc.invalidateQueries({ queryKey: qk.checklistCompletions(profile.clinic_id, today) })
+  }
 
   return (
     <div
@@ -459,6 +479,9 @@ function ChecklistItem({
                   {name}
                   {' '}
                   <span className="text-brand-300">{time}</span>
+                  {c.observacion && (
+                    <span className="text-brand-400"> — "{c.observacion}"</span>
+                  )}
                   {isAdmin && !isOwn && (
                     <button
                       onClick={() => onAdminRemove(c.id)}
@@ -473,6 +496,17 @@ function ChecklistItem({
               )
             })}
           </p>
+        )}
+
+        {checked && (
+          <input
+            type="text"
+            value={obs}
+            onChange={(e) => setObs(e.target.value)}
+            onBlur={(e) => saveObs(e.target.value)}
+            placeholder="Añadir nota..."
+            className="mt-1 w-full text-xs px-2 py-1 border border-brand-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-brand-400 text-brand-700 placeholder:text-brand-300"
+          />
         )}
       </div>
 
